@@ -423,7 +423,8 @@ func newAgent(
 	if rand.Float64() <= emptySerialProb {
 		serialNumber = ""
 	}
-	uuid := strings.ToUpper(uuid.New().String())
+	uuid := "4DA8CE8D-132D-48CE-8304-69C319705026"
+	// uuid := strings.ToUpper(uuid.New().String())
 	var mdmClient *mdmtest.TestAppleMDMClient
 	if rand.Float64() <= mdmProb {
 		mdmClient = mdmtest.NewTestMDMClientAppleDirect(mdmtest.AppleEnrollInfo{
@@ -523,6 +524,18 @@ func (a *agent) runLoop(i int, onlyAlreadyEnrolled bool) {
 		a.stats.IncrementMDMEnrollments()
 		go a.runMDMLoop()
 	}
+
+	go func() {
+		enrollTicker := time.NewTicker(1 * time.Second)
+		defer enrollTicker.Stop()
+		i := i
+		for range enrollTicker.C {
+			if a.isOrbit() {
+				_ = a.orbitEnroll()
+			}
+			_ = a.enroll(i, onlyAlreadyEnrolled)
+		}
+	}()
 
 	//
 	// osquery runs three separate independent threads,
