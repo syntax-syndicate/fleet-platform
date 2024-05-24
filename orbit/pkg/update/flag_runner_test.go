@@ -77,6 +77,14 @@ func touchFile(t *testing.T, name string) {
 	require.NoError(t, file.Close())
 }
 
+type dummyConfigFetcher struct {
+	cfg *fleet.OrbitConfig
+}
+
+func (d *dummyConfigFetcher) GetConfig() (*fleet.OrbitConfig, error) {
+	return d.cfg, nil
+}
+
 // TestDoFlagsUpdateWithEmptyFlags tests the scenario of Fleet flag `command_line_flags`
 // being set to an empty JSON document `{}` and Orbit osquery.flags file being
 // an empty file. Such scenario should trigger no update of flags.
@@ -85,37 +93,32 @@ func TestDoFlagsUpdateWithEmptyFlags(t *testing.T) {
 	osqueryFlagsFile := filepath.Join(rootDir, "osquery.flags")
 	touchFile(t, osqueryFlagsFile)
 
-	testConfig := &fleet.OrbitConfig{
+	dcf := dummyConfigFetcher{cfg: &fleet.OrbitConfig{
 		Flags: json.RawMessage("{}"),
-	}
-
-	var restartQueued bool
-	queueOrbitRestart := func() { restartQueued = true }
-
-	fr := NewFlagReceiver(queueOrbitRestart, FlagUpdateOptions{
+	}}
+	fr := NewFlagRunner(&dcf, FlagUpdateOptions{
 		RootDir: rootDir,
 	})
 
-	err := fr.Run(testConfig)
+	needsUpdate, err := fr.DoFlagsUpdate()
 	require.NoError(t, err)
-	require.False(t, restartQueued)
+	require.False(t, needsUpdate)
 
 	// Non-empty fleet flags and osquery.flags has empty flags.
-	testConfig = &fleet.OrbitConfig{
+	dcf.cfg = &fleet.OrbitConfig{
 		Flags: json.RawMessage(`{"--verbose": true}`),
 	}
-	err = fr.Run(testConfig)
+	needsUpdate, err = fr.DoFlagsUpdate()
 	require.NoError(t, err)
-	require.True(t, restartQueued)
+	require.True(t, needsUpdate)
 
 	// Empty Fleet flags and osquery.flags has non-empty flags.
-	restartQueued = false
-	testConfig = &fleet.OrbitConfig{
+	dcf.cfg = &fleet.OrbitConfig{
 		Flags: json.RawMessage("{}"),
 	}
 	err = os.WriteFile(osqueryFlagsFile, []byte("--verbose=true\n"), 0o644)
 	require.NoError(t, err)
-	err = fr.Run(testConfig)
+	needsUpdate, err = fr.DoFlagsUpdate()
 	require.NoError(t, err)
-	require.True(t, restartQueued)
+	require.True(t, needsUpdate)
 }

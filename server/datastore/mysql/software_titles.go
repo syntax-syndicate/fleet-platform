@@ -13,16 +13,11 @@ import (
 )
 
 func (ds *Datastore) SoftwareTitleByID(ctx context.Context, id uint, teamID *uint, tmFilter fleet.TeamFilter) (*fleet.SoftwareTitle, error) {
-	var teamFilter string // used to filter software titles host counts by team
+	var teamFilter string
 	if teamID != nil {
 		teamFilter = fmt.Sprintf("sthc.team_id = %d", *teamID)
 	} else {
 		teamFilter = ds.whereFilterGlobalOrTeamIDByTeams(tmFilter, "sthc")
-	}
-
-	var tmID uint // used to filter software installers by team
-	if teamID != nil {
-		tmID = *teamID
 	}
 
 	selectSoftwareTitleStmt := fmt.Sprintf(`
@@ -31,12 +26,12 @@ SELECT
 	st.name,
 	st.source,
 	st.browser,
-	COALESCE(SUM(sthc.hosts_count), 0) as hosts_count,
+	SUM(sthc.hosts_count) as hosts_count,
 	MAX(sthc.updated_at)  as counts_updated_at
 FROM software_titles st
-LEFT JOIN software_titles_host_counts sthc ON sthc.software_title_id = st.id AND %s
-WHERE st.id = ? 
-AND (sthc.hosts_count > 0 OR EXISTS (SELECT 1 FROM software_installers si WHERE si.title_id = st.id AND si.global_or_team_id = ?))
+JOIN software_titles_host_counts sthc ON sthc.software_title_id = st.id
+WHERE st.id = ? AND %s
+AND sthc.hosts_count > 0
 GROUP BY
 	st.id,
 	st.name,
@@ -45,7 +40,7 @@ GROUP BY
 	`, teamFilter,
 	)
 	var title fleet.SoftwareTitle
-	if err := sqlx.GetContext(ctx, ds.reader(ctx), &title, selectSoftwareTitleStmt, id, tmID); err != nil {
+	if err := sqlx.GetContext(ctx, ds.reader(ctx), &title, selectSoftwareTitleStmt, id); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, notFound("SoftwareTitle").WithID(id)
 		}
@@ -69,7 +64,7 @@ func (ds *Datastore) ListSoftwareTitles(
 	ctx context.Context,
 	opt fleet.SoftwareTitleListOptions,
 	tmFilter fleet.TeamFilter,
-) ([]fleet.SoftwareTitleListResult, int, *fleet.PaginationMetadata, error) {
+) ([]fleet.SoftwareTitle, int, *fleet.PaginationMetadata, error) {
 	if opt.ListOptions.After != "" {
 		return nil, 0, nil, fleet.NewInvalidArgumentError("after", "not supported for software titles")
 	}
@@ -83,17 +78,13 @@ func (ds *Datastore) ListSoftwareTitles(
 		opt.ListOptions.OrderDirection = fleet.OrderDescending
 	}
 
-	if opt.AvailableForInstall && opt.VulnerableOnly {
-		return nil, 0, nil, fleet.NewInvalidArgumentError("query", "available_for_install and vulnerable can't be provided together")
-	}
-
 	dbReader := ds.reader(ctx)
 	getTitlesStmt, args := selectSoftwareTitlesSQL(opt)
 	// build the count statement before adding the pagination constraints to `getTitlesStmt`
 	getTitlesCountStmt := fmt.Sprintf(`SELECT COUNT(DISTINCT s.id) FROM (%s) AS s`, getTitlesStmt)
 
 	// grab titles that match the list options
-	var titles []fleet.SoftwareTitleListResult
+	var titles []fleet.SoftwareTitle
 	getTitlesStmt, args = appendListOptionsWithCursorToSQL(getTitlesStmt, args, &opt.ListOptions)
 	// appendListOptionsWithCursorToSQL doesn't support multicolumn sort, so
 	// we need to add it here
@@ -200,76 +191,45 @@ SELECT
 	st.name,
 	st.source,
 	st.browser,
-	MAX(COALESCE(sthc.hosts_count, 0)) as hosts_count,
-	MAX(COALESCE(sthc.updated_at, date('0001-01-01 00:00:00'))) as counts_updated_at,
-	si.filename as software_package
+	MAX(sthc.hosts_count) as hosts_count,
+	MAX(sthc.updated_at) as counts_updated_at
 FROM software_titles st
-LEFT JOIN software_installers si ON si.title_id = st.id AND COALESCE(si.team_id, 0) = ?
-LEFT JOIN software_titles_host_counts sthc ON sthc.software_title_id = st.id AND sthc.team_id = ?
+JOIN software_titles_host_counts sthc ON sthc.software_title_id = st.id
 -- placeholder for JOIN on software/software_cve
 %s
 -- placeholder for optional extra WHERE filter
-WHERE %s
--- placeholder for filter based on software installed on hosts + software installers
-AND (%s)
-GROUP BY st.id, software_package`
+WHERE sthc.team_id = ? %s
+AND sthc.hosts_count > 0
+GROUP BY st.id`
 
 	cveJoinType := "LEFT"
 	if opt.VulnerableOnly {
 		cveJoinType = "INNER"
 	}
 
-	var globalOrTeamID uint
-	args := []any{0, 0}
+	args := []any{0}
 	if opt.TeamID != nil {
 		args[0] = *opt.TeamID
-		args[1] = *opt.TeamID
-		globalOrTeamID = *opt.TeamID
 	}
 
-	additionalWhere := "TRUE"
+	additionalWhere := ""
 	match := opt.ListOptions.MatchQuery
 	softwareJoin := ""
 	if match != "" || opt.VulnerableOnly {
-		// if we do a match but not vulnerable only, we want a LEFT JOIN on
-		// software because software installers may not have entries in software
-		// for their software title. If we do want vulnerable only, then we have to
-		// INNER JOIN because a CVE implies a specific software version.
 		softwareJoin = fmt.Sprintf(`
-			%s JOIN software s ON s.title_id = st.id
+			JOIN software s ON s.title_id = st.id
 			-- placeholder for changing the JOIN type to filter vulnerable software
-			%[1]s JOIN software_cve scve ON s.id = scve.software_id
+			%s JOIN software_cve scve ON s.id = scve.software_id
 		`, cveJoinType)
 	}
 
 	if match != "" {
-		additionalWhere = " (st.name LIKE ? OR scve.cve LIKE ?)"
+		additionalWhere += " AND (st.name LIKE ? OR scve.cve LIKE ?)"
 		match = likePattern(match)
 		args = append(args, match, match)
 	}
 
-	defaultFilter := `
-	  EXISTS (
-	    SELECT 1
-	    FROM
-	      software_installers si
-	    WHERE
-	      si.title_id = st.id
-	      AND si.global_or_team_id = ?
-	  )
-	`
-
-	// add software installed for hosts if any of this is true:
-	//
-	// - we're not filtering for "available for install" only
-	// - we're filtering by vulnerable only
-	if !opt.AvailableForInstall || opt.VulnerableOnly {
-		defaultFilter += `OR sthc.hosts_count > 0`
-	}
-
-	args = append(args, globalOrTeamID)
-
-	stmt = fmt.Sprintf(stmt, softwareJoin, additionalWhere, defaultFilter)
+	stmt = fmt.Sprintf(stmt, softwareJoin, additionalWhere)
 	return stmt, args
 }
 

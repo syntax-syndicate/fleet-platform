@@ -606,7 +606,6 @@ func (s *integrationMDMTestSuite) TestLifecycleSCEPCertExpiration() {
 	require.NoError(t, err)
 	manualEnrolledDevice := mdmtest.NewTestMDMClientAppleDesktopManual(s.server.URL, desktopToken)
 	manualEnrolledDevice.UUID = manualHost.UUID
-	manualEnrolledDevice.SerialNumber = manualHost.HardwareSerial
 	err = manualEnrolledDevice.Enroll()
 	require.NoError(t, err)
 
@@ -692,19 +691,15 @@ func (s *integrationMDMTestSuite) TestLifecycleSCEPCertExpiration() {
 	require.NoError(t, err)
 	require.Nil(t, cmd)
 
-	expireCerts := func() {
-		mysql.ExecAdhocSQL(t, s.ds, func(q sqlx.ExtContext) error {
-			_, err := q.ExecContext(ctx, `
+	// expire all the certs we just created
+	mysql.ExecAdhocSQL(t, s.ds, func(q sqlx.ExtContext) error {
+		_, err := q.ExecContext(ctx, `
                   UPDATE nano_cert_auth_associations
                   SET cert_not_valid_after = DATE_SUB(CURDATE(), INTERVAL 1 YEAR)
                   WHERE id IN (?, ?, ?)
 		`, manualHost.UUID, automaticHost.UUID, automaticHostWithRef.UUID)
-			return err
-		})
-	}
-
-	// expire all the certs we just created
-	expireCerts()
+		return err
+	})
 
 	// generate a new config here so we can manipulate the certs.
 	err = RenewSCEPCertificates(ctx, logger, s.ds, &fleetCfg, s.mdmCommander)
@@ -764,16 +759,4 @@ func (s *integrationMDMTestSuite) TestLifecycleSCEPCertExpiration() {
 	cmd, err = automaticEnrolledDeviceWithRef.Idle()
 	require.NoError(t, err)
 	require.Nil(t, cmd)
-
-	// handle the case of a host being deleted, see https://github.com/fleetdm/fleet/issues/19149
-	expireCerts()
-	req := deleteHostsRequest{
-		IDs: []uint{manualHost.ID},
-	}
-	resp := deleteHostsResponse{}
-	s.DoJSON("POST", "/api/latest/fleet/hosts/delete", req, http.StatusOK, &resp)
-	err = RenewSCEPCertificates(ctx, logger, s.ds, &fleetCfg, s.mdmCommander)
-	require.NoError(t, err)
-	checkRenewCertCommand(automaticEnrolledDevice, "")
-	checkRenewCertCommand(automaticEnrolledDeviceWithRef, "foo")
 }

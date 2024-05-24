@@ -33,7 +33,7 @@ const mockLocation = {
 };
 
 describe("Device User Page", () => {
-  it("hides the software tab if the device has no software", async () => {
+  it("renders the software empty message if the device has no software", async () => {
     const render = createCustomRenderer({
       withBackendMock: true,
     });
@@ -50,7 +50,7 @@ describe("Device User Page", () => {
     // waiting for the device data to render
     await screen.findByText("About");
 
-    expect(screen.queryByText(/Software/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "Software" }));
 
     // TODO: Fix this to the new copy
     // expect(screen.getByText("No software detected")).toBeInTheDocument();

@@ -1,7 +1,7 @@
 import React from "react";
 
-import { IHostActivity } from "interfaces/activity";
-import { IHostActivitiesResponse } from "services/entities/activities";
+import { IPastActivity } from "interfaces/activity";
+import { IPastActivitiesResponse } from "services/entities/activities";
 
 // @ts-ignore
 import FleetIcon from "components/icons/FleetIcon";
@@ -16,7 +16,7 @@ import { pastActivityComponentMap } from "../ActivityConfig";
 const baseClass = "past-activity-feed";
 
 interface IPastActivityFeedProps {
-  activities?: IHostActivitiesResponse;
+  activities?: IPastActivitiesResponse;
   isError?: boolean;
   onDetailsClick: ShowActivityDetailsHandler;
   onNextPage: () => void;
@@ -53,7 +53,7 @@ const PastActivityFeed = ({
   return (
     <div className={baseClass}>
       <div>
-        {activitiesList.map((activity: IHostActivity) => {
+        {activitiesList.map((activity: IPastActivity) => {
           const ActivityItemComponent = pastActivityComponentMap[activity.type];
           return (
             <ActivityItemComponent

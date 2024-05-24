@@ -50,7 +50,6 @@ interface IDataColumn {
     | ((props: IPerformanceImpactCell) => JSX.Element);
   disableHidden?: boolean;
   disableSortBy?: boolean;
-  sortType?: string;
 }
 
 // NOTE: cellProps come from react-table
@@ -67,7 +66,6 @@ const generateColumnConfigs = (
       Cell: (cellProps: ICellProps) => (
         <TextCell value={cellProps.cell.value} />
       ),
-      sortType: "caseInsensitive",
     },
     {
       Header: () => {

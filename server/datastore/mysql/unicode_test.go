@@ -25,8 +25,7 @@ func TestUnicode(t *testing.T) {
 	require.Nil(t, err)
 	l1.ID = labelIDFromName(t, ds, l1.Name)
 
-	filter := fleet.TeamFilter{User: test.UserAdmin}
-	label, _, err := ds.Label(context.Background(), l1.ID, filter)
+	label, _, err := ds.Label(context.Background(), l1.ID)
 	require.Nil(t, err)
 	assert.Equal(t, "測試", label.Name)
 

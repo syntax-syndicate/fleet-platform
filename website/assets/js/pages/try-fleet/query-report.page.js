@@ -55,17 +55,17 @@ parasails.registerPage('query-report', {
   watch: {
     selectedTable: function(val){
       if(val !== this.tableToDisplay){
-        this.goto(`/try-fleet/explore-data/${this.selectedHost}/${this.selectedTable}`);
+        window.location = `/try-fleet/explore-data/${this.selectedHost}/${this.selectedTable}`;
       }
     },
     hostToDisplayResultsFor: function(val){
       if(val !== this.selectedHost){
         if(val === 'Linux'){
-          this.goto(`/try-fleet/explore-data/linux/apparmor_events`);
+          window.location = `/try-fleet/explore-data/linux/apparmor_events`;
         } else if(val === 'Windows'){
-          this.goto(`/try-fleet/explore-data/windows/appcompat_shims`);
+          window.location = `/try-fleet/explore-data/windows/appcompat_shims`;
         } else {
-          this.goto(`/try-fleet/explore-data/macos/account_policy_data`);
+          window.location = `/try-fleet/explore-data/macos/account_policy_data`;
         }
       }
     }
@@ -85,6 +85,7 @@ parasails.registerPage('query-report', {
 
         tableContainer.addEventListener('scroll', (event)=>{
           let container = event.target;
+          console.log(container);
           let isScrolledFullyToLeft = container.scrollLeft === 0;
           let isScrolledFullyToRight = (container.scrollWidth - container.scrollLeft <= container.clientWidth + 1);
           // Update the class on the table container based on how much the table is scrolled.

@@ -6,7 +6,6 @@ import { AppContext } from "context/app";
 import { IEmptyTableProps } from "interfaces/empty_table";
 import { IEnhancedQuery } from "interfaces/schedulable_query";
 import { ITableQueryData } from "components/TableContainer/TableContainer";
-import { IActionButtonProps } from "components/TableContainer/DataTable/ActionButton/ActionButton";
 import PATHS from "router/paths";
 import { getNextLocationPath } from "utilities/helpers";
 import Button from "components/buttons/Button";
@@ -170,7 +169,7 @@ const QueriesTable = ({
     [platform, searchQuery, sortDirection, sortHeader] // Dependencies required for correct variable state
   );
 
-  const getEmptyStateParams = useCallback(() => {
+  const emptyState = () => {
     const emptyQueries: IEmptyTableProps = {
       graphicName: "empty-queries",
       header: "You don't have any queries",
@@ -202,28 +201,22 @@ const QueriesTable = ({
     }
 
     return emptyQueries;
-  }, [
-    isAnyTeamObserverPlus,
-    isObserverPlus,
-    isOnlyObserver,
-    onCreateQueryClick,
-    searchQuery,
-  ]);
+  };
 
-  const renderPlatformDropdown = useCallback(() => {
-    const handlePlatformFilterDropdownChange = (platformSelected: string) => {
-      router?.replace(
-        getNextLocationPath({
-          pathPrefix: PATHS.MANAGE_QUERIES,
-          queryParams: {
-            ...queryParams,
-            page: 0,
-            platform: platformSelected,
-          },
-        })
-      );
-    };
+  const handlePlatformFilterDropdownChange = (platformSelected: string) => {
+    router?.replace(
+      getNextLocationPath({
+        pathPrefix: PATHS.MANAGE_QUERIES,
+        queryParams: {
+          ...queryParams,
+          page: 0,
+          platform: platformSelected,
+        },
+      })
+    );
+  };
 
+  const renderPlatformDropdown = () => {
     return (
       <Dropdown
         value={platform}
@@ -234,7 +227,7 @@ const QueriesTable = ({
         tableFilterDropdown
       />
     );
-  }, [platform, queryParams, router]);
+  };
 
   const columnConfigs = useMemo(
     () =>
@@ -249,45 +242,14 @@ const QueriesTable = ({
 
   const searchable = !(queriesList?.length === 0 && searchQuery === "");
 
-  const emptyComponent = useCallback(() => {
-    const {
-      graphicName,
-      header,
-      info,
-      additionalInfo,
-      primaryButton,
-    } = getEmptyStateParams();
-    return EmptyTable({
-      graphicName,
-      header,
-      info,
-      additionalInfo,
-      primaryButton,
-    });
-  }, [getEmptyStateParams]);
-
   const trimmedSearchQuery = searchQuery.trim();
-
-  const deleteQueryTableActionButtonProps = useMemo(
-    () =>
-      ({
-        name: "delete query",
-        buttonText: "Delete",
-        iconSvg: "trash",
-        variant: "text-icon",
-        onActionButtonClick: onDeleteQueryClick,
-        // this maintains the existing typing, which is not actually correct
-        // TODO - update this object to actually implement IActionButtonProps
-      } as IActionButtonProps),
-    [onDeleteQueryClick]
-  );
   return columnConfigs && !isLoading ? (
     <div className={`${baseClass}`}>
       <TableContainer
         resultsTitle="queries"
         columnConfigs={columnConfigs}
         data={queriesList}
-        filters={{ global: trimmedSearchQuery }}
+        filters={{ name: trimmedSearchQuery }}
         isLoading={isLoading}
         defaultSortHeader={sortHeader || DEFAULT_SORT_HEADER}
         defaultSortDirection={sortDirection || DEFAULT_SORT_DIRECTION}
@@ -296,7 +258,15 @@ const QueriesTable = ({
         pageSize={DEFAULT_PAGE_SIZE}
         inputPlaceHolder="Search by name"
         onQueryChange={onQueryChange}
-        emptyComponent={emptyComponent}
+        emptyComponent={() =>
+          EmptyTable({
+            graphicName: emptyState().graphicName,
+            header: emptyState().header,
+            info: emptyState().info,
+            additionalInfo: emptyState().additionalInfo,
+            primaryButton: emptyState().primaryButton,
+          })
+        }
         showMarkAllPages={false}
         isAllPagesSelected={false}
         searchable={searchable}
@@ -305,8 +275,13 @@ const QueriesTable = ({
         isClientSidePagination
         onClientSidePaginationChange={onClientSidePaginationChange}
         isClientSideFilter
-        primarySelectAction={deleteQueryTableActionButtonProps}
-        // TODO - consolidate this functionality within `filters`
+        primarySelectAction={{
+          name: "delete query",
+          buttonText: "Delete",
+          iconSvg: "trash",
+          variant: "text-icon",
+          onActionButtonClick: onDeleteQueryClick,
+        }}
         selectedDropdownFilter={platform}
         show0Count
       />

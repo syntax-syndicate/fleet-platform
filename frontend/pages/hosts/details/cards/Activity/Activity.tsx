@@ -3,7 +3,7 @@ import { Tab, TabList, TabPanel, Tabs } from "react-tabs";
 
 import { IActivityDetails } from "interfaces/activity";
 import {
-  IHostActivitiesResponse,
+  IPastActivitiesResponse,
   IUpcomingActivitiesResponse,
 } from "services/entities/activities";
 
@@ -48,7 +48,7 @@ const UpcomingTooltip = () => {
 
 interface IActivityProps {
   activeTab: "past" | "upcoming";
-  activities?: IHostActivitiesResponse | IUpcomingActivitiesResponse;
+  activities?: IPastActivitiesResponse | IUpcomingActivitiesResponse;
   isLoading?: boolean;
   isError?: boolean;
   upcomingCount: number;
@@ -101,7 +101,7 @@ const Activity = ({
           </TabList>
           <TabPanel>
             <PastActivityFeed
-              activities={activities as IHostActivitiesResponse | undefined}
+              activities={activities as IPastActivitiesResponse | undefined}
               onDetailsClick={onShowDetails}
               isError={isError}
               onNextPage={onNextPage}

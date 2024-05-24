@@ -2,7 +2,7 @@ import React from "react";
 import ReactTooltip from "react-tooltip";
 import { formatDistanceToNowStrict } from "date-fns";
 
-import { ActivityType, IHostActivity } from "interfaces/activity";
+import { IActivity } from "interfaces/activity";
 import { COLORS } from "styles/var/colors";
 import { DEFAULT_GRAVATAR_LINK } from "utilities/constants";
 import {
@@ -19,38 +19,9 @@ import { ShowActivityDetailsHandler } from "../Activity";
 const baseClass = "upcoming-activity";
 
 interface IUpcomingActivityProps {
-  activity: IHostActivity;
+  activity: IActivity;
   onDetailsClick: ShowActivityDetailsHandler;
 }
-
-const formatPredicate = ({ type, details }: IHostActivity) => {
-  switch (type) {
-    case ActivityType.RanScript:
-      return (
-        <>
-          told Fleet to run{" "}
-          {formatScriptNameForActivityItem(details?.script_name)}
-        </>
-      );
-    case ActivityType.InstalledSoftware:
-      return (
-        <>
-          told Fleet to install{" "}
-          {details?.software_title ? (
-            <>
-              <b>{details.software_title}</b>{" "}
-            </>
-          ) : (
-            ""
-          )}
-          software
-        </>
-      );
-    default:
-      // this should never happen
-      return <>{type}</>;
-  }
-};
 
 // TODO: Combine this with ./UpcomingActivity/UpcomingActivity.tsx and
 // frontend/pages/DashboardPage/cards/ActivityFeed/ActivityItem/ActivityItem.tsx
@@ -75,16 +46,23 @@ const UpcomingActivity = ({
       <div className={`${baseClass}__details-wrapper`}>
         <div className="activity-details">
           <span className={`${baseClass}__details-topline`}>
-            <b>{activity.actor_full_name}</b> {formatPredicate(activity)} on
-            this host.{" "}
-            <Button
-              className={`${baseClass}__show-query-link`}
-              variant="text-link"
-              onClick={() => onDetailsClick?.(activity)}
-            >
-              Show details{" "}
-              <Icon className={`${baseClass}__show-query-icon`} name="eye" />
-            </Button>
+            <b>{activity.actor_full_name}</b>
+            <>
+              {" "}
+              told Fleet to run{" "}
+              {formatScriptNameForActivityItem(
+                activity.details?.script_name
+              )}{" "}
+              on this host.{" "}
+              <Button
+                className={`${baseClass}__show-query-link`}
+                variant="text-link"
+                onClick={() => onDetailsClick?.(activity)}
+              >
+                Show details{" "}
+                <Icon className={`${baseClass}__show-query-icon`} name="eye" />
+              </Button>
+            </>
           </span>
           <br />
           <span

@@ -13,10 +13,10 @@ import PATHS from "router/paths";
 
 import HeaderCell from "components/TableContainer/DataTable/HeaderCell";
 import TextCell from "components/TableContainer/DataTable/TextCell";
+import LinkCell from "components/TableContainer/DataTable/LinkCell/LinkCell";
 import ViewAllHostsLink from "components/ViewAllHostsLink";
-import SoftwareNameCell from "components/TableContainer/DataTable/SoftwareNameCell";
-
 import VulnerabilitiesCell from "../../components/VulnerabilitiesCell";
+import SoftwareIcon from "../../components/icons/SoftwareIcon";
 
 // NOTE: cellProps come from react-table
 // more info here https://react-table.tanstack.com/docs/api/useTable#cell-properties
@@ -52,24 +52,27 @@ const generateTableHeaders = (
           id.toString()
         )}?${teamQueryParam}`;
 
+        const onClickSoftware = (e: React.MouseEvent) => {
+          // Allows for button to be clickable in a clickable row
+          e.stopPropagation();
+
+          router?.push(softwareVersionDetailsPath);
+        };
+
         return (
-          <SoftwareNameCell
-            name={name}
-            source={source}
+          <LinkCell
             path={softwareVersionDetailsPath}
-            router={router}
+            customOnClick={onClickSoftware}
+            value={
+              <>
+                <SoftwareIcon name={name} source={source} />
+                <span className="software-name">{name}</span>
+              </>
+            }
           />
         );
       },
       sortType: "caseInsensitive",
-    },
-    {
-      Header: "Type",
-      disableSortBy: true,
-      accessor: "source",
-      Cell: (cellProps: ITableStringCellProps) => (
-        <TextCell value={formatSoftwareType(cellProps.row.original)} />
-      ),
     },
     {
       Header: "Version",
@@ -77,6 +80,14 @@ const generateTableHeaders = (
       accessor: "version",
       Cell: (cellProps: ITableStringCellProps) => (
         <TextCell value={cellProps.cell.value} />
+      ),
+    },
+    {
+      Header: "Type",
+      disableSortBy: true,
+      accessor: "source",
+      Cell: (cellProps: ITableStringCellProps) => (
+        <TextCell value={formatSoftwareType(cellProps.row.original)} />
       ),
     },
     {

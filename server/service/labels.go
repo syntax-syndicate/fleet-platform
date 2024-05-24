@@ -33,7 +33,7 @@ func createLabelEndpoint(ctx context.Context, request interface{}, svc fleet.Ser
 		return createLabelResponse{Err: err}, nil
 	}
 
-	labelResp, err := labelResponseForLabel(label, hostIDs)
+	labelResp, err := labelResponseForLabel(ctx, svc, label, hostIDs)
 	if err != nil {
 		return createLabelResponse{Err: err}, nil
 	}
@@ -45,11 +45,6 @@ func (svc *Service) NewLabel(ctx context.Context, p fleet.LabelPayload) (*fleet.
 	if err := svc.authz.Authorize(ctx, &fleet.Label{}, fleet.ActionWrite); err != nil {
 		return nil, nil, err
 	}
-	vc, ok := viewer.FromContext(ctx)
-	if !ok {
-		return nil, nil, fleet.ErrNoContext
-	}
-	filter := fleet.TeamFilter{User: vc.User, IncludeObserver: true}
 
 	label := &fleet.Label{
 		LabelType:           fleet.LabelTypeRegular,
@@ -79,8 +74,7 @@ func (svc *Service) NewLabel(ctx context.Context, p fleet.LabelPayload) (*fleet.
 	}
 
 	// first create the new label, which will fail if the name is not unique
-	var err error
-	label, err = svc.ds.NewLabel(ctx, label)
+	newLbl, err := svc.ds.NewLabel(ctx, label)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -107,8 +101,8 @@ func (svc *Service) NewLabel(ctx context.Context, p fleet.LabelPayload) (*fleet.
 			return nil, nil, err
 		}
 
-		// must reload it to get the host IDs, refresh its count
-		label, hostIDs, err = svc.ds.Label(ctx, label.ID, filter)
+		// must reload it to get the host IDs
+		label, hostIDs, err = svc.ds.Label(ctx, newLbl.ID)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -139,7 +133,7 @@ func modifyLabelEndpoint(ctx context.Context, request interface{}, svc fleet.Ser
 		return modifyLabelResponse{Err: err}, nil
 	}
 
-	labelResp, err := labelResponseForLabel(label, hostIDs)
+	labelResp, err := labelResponseForLabel(ctx, svc, label, hostIDs)
 	if err != nil {
 		return modifyLabelResponse{Err: err}, nil
 	}
@@ -151,13 +145,8 @@ func (svc *Service) ModifyLabel(ctx context.Context, id uint, payload fleet.Modi
 	if err := svc.authz.Authorize(ctx, &fleet.Label{}, fleet.ActionWrite); err != nil {
 		return nil, nil, err
 	}
-	vc, ok := viewer.FromContext(ctx)
-	if !ok {
-		return nil, nil, fleet.ErrNoContext
-	}
-	filter := fleet.TeamFilter{User: vc.User, IncludeObserver: true}
 
-	label, _, err := svc.ds.Label(ctx, id, filter)
+	label, _, err := svc.ds.Label(ctx, id)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -204,9 +193,9 @@ func (svc *Service) ModifyLabel(ctx context.Context, id uint, payload fleet.Modi
 		}
 
 		// must reload it to get the host counts information
-		return svc.ds.Label(ctx, id, filter)
+		return svc.ds.Label(ctx, id)
 	}
-	return svc.ds.SaveLabel(ctx, label, filter)
+	return svc.ds.SaveLabel(ctx, label)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -221,7 +210,7 @@ type labelResponse struct {
 	fleet.Label
 	DisplayText string `json:"display_text"`
 	Count       int    `json:"count"`
-	HostIDs     []uint `json:"host_ids,omitempty"`
+	HostIDs     []uint `json:"host_ids"`
 }
 
 type getLabelResponse struct {
@@ -237,7 +226,7 @@ func getLabelEndpoint(ctx context.Context, request interface{}, svc fleet.Servic
 	if err != nil {
 		return getLabelResponse{Err: err}, nil
 	}
-	resp, err := labelResponseForLabel(label, hostIDs)
+	resp, err := labelResponseForLabel(ctx, svc, label, hostIDs)
 	if err != nil {
 		return getLabelResponse{Err: err}, nil
 	}
@@ -248,13 +237,8 @@ func (svc *Service) GetLabel(ctx context.Context, id uint) (*fleet.Label, []uint
 	if err := svc.authz.Authorize(ctx, &fleet.Label{}, fleet.ActionRead); err != nil {
 		return nil, nil, err
 	}
-	vc, ok := viewer.FromContext(ctx)
-	if !ok {
-		return nil, nil, fleet.ErrNoContext
-	}
-	filter := fleet.TeamFilter{User: vc.User, IncludeObserver: true}
 
-	return svc.ds.Label(ctx, id, filter)
+	return svc.ds.Label(ctx, id)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -282,7 +266,7 @@ func listLabelsEndpoint(ctx context.Context, request interface{}, svc fleet.Serv
 
 	resp := listLabelsResponse{}
 	for _, label := range labels {
-		labelResp, err := labelResponseForLabel(label, nil)
+		labelResp, err := labelResponseForLabel(ctx, svc, label, nil)
 		if err != nil {
 			return listLabelsResponse{Err: err}, nil
 		}
@@ -310,7 +294,7 @@ func (svc *Service) ListLabels(ctx context.Context, opt fleet.ListOptions) ([]*f
 	return svc.ds.ListLabels(ctx, filter, opt)
 }
 
-func labelResponseForLabel(label *fleet.Label, hostIDs []uint) (*labelResponse, error) {
+func labelResponseForLabel(ctx context.Context, svc fleet.Service, label *fleet.Label, hostIDs []uint) (*labelResponse, error) {
 	return &labelResponse{
 		Label:       *label,
 		DisplayText: label.Name,
@@ -457,13 +441,8 @@ func (svc *Service) DeleteLabelByID(ctx context.Context, id uint) error {
 	if err := svc.authz.Authorize(ctx, &fleet.Label{}, fleet.ActionWrite); err != nil {
 		return err
 	}
-	vc, ok := viewer.FromContext(ctx)
-	if !ok {
-		return fleet.ErrNoContext
-	}
-	filter := fleet.TeamFilter{User: vc.User, IncludeObserver: true}
 
-	label, _, err := svc.ds.Label(ctx, id, filter)
+	label, _, err := svc.ds.Label(ctx, id)
 	if err != nil {
 		return err
 	}

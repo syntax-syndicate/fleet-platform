@@ -6,7 +6,6 @@ interface IDownload {
   color?: Colors;
   size?: IconSizes;
 }
-
 const Download = ({
   color = "ui-fleet-black-75",
   size = "medium",

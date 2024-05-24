@@ -71,10 +71,7 @@ const config = {
           filename: "[name]@[hash][ext]",
         },
       },
-      {
-        test: /\.(sh|ps1)$/,
-        type: "asset/source",
-      },
+
       {
         test: /(\.tsx?|\.jsx?)$/,
         exclude: /node_modules/,

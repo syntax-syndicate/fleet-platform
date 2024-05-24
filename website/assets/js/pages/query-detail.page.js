@@ -23,7 +23,7 @@ parasails.registerPage('query-detail', {
   //  ╩╝╚╝ ╩ ╚═╝╩╚═╩ ╩╚═╝ ╩ ╩╚═╝╝╚╝╚═╝
   methods: {
     clickAvatar: function (contributor) {
-      this.goto(contributor.htmlUrl);
+      window.location = contributor.htmlUrl;
     },
     getDisplayName: function (contributor) {
       return !contributor.name ? contributor.handle : contributor.name;

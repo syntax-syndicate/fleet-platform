@@ -1,7 +1,8 @@
-/**
+/** 
  software/titles Software tab
- software/versions Software tab (version toggle on)
+ software/versions Software tab (version toggle on) 
  */
+
 import React from "react";
 import { InjectedRouter } from "react-router";
 import { useQuery } from "react-query";
@@ -15,9 +16,7 @@ import softwareAPI, {
 
 import Spinner from "components/Spinner";
 import TableDataError from "components/DataError";
-
 import SoftwareTable from "./SoftwareTable";
-import { ISoftwareDropdownFilterVal } from "./SoftwareTable/helpers";
 
 const baseClass = "software-titles";
 
@@ -42,7 +41,7 @@ interface ISoftwareTitlesProps {
   perPage: number;
   orderDirection: "asc" | "desc";
   orderKey: string;
-  softwareFilter: ISoftwareDropdownFilterVal;
+  showVulnerableSoftware: boolean;
   currentPage: number;
   teamId?: number;
 }
@@ -54,30 +53,11 @@ const SoftwareTitles = ({
   perPage,
   orderDirection,
   orderKey,
-  softwareFilter,
+  showVulnerableSoftware,
   currentPage,
   teamId,
 }: ISoftwareTitlesProps) => {
   const showVersions = location.pathname === PATHS.SOFTWARE_VERSIONS;
-
-  const generateSoftwareTitlesQueryKey = (): ISoftwareTitlesQueryKey => {
-    const queryKey: ISoftwareTitlesQueryKey = {
-      scope: "software-titles",
-      page: currentPage,
-      perPage,
-      query,
-      orderDirection,
-      orderKey,
-      teamId,
-    };
-    if (softwareFilter === "installableSoftware") {
-      queryKey.availableForInstall = true;
-    } else {
-      queryKey.vulnerable = softwareFilter === "vulnerableSoftware";
-    }
-
-    return queryKey;
-  };
 
   // request to get software data
   const {
@@ -91,7 +71,18 @@ const SoftwareTitles = ({
     ISoftwareTitlesResponse,
     ISoftwareTitlesQueryKey[]
   >(
-    [generateSoftwareTitlesQueryKey()],
+    [
+      {
+        scope: "software-titles",
+        page: currentPage,
+        perPage,
+        query,
+        orderDirection,
+        orderKey,
+        teamId,
+        vulnerable: showVulnerableSoftware,
+      },
+    ],
     ({ queryKey }) => softwareAPI.getSoftwareTitles(queryKey[0]),
     {
       ...QUERY_OPTIONS,
@@ -120,7 +111,7 @@ const SoftwareTitles = ({
         orderDirection,
         orderKey,
         teamId,
-        vulnerable: softwareFilter === "vulnerableSoftware",
+        vulnerable: showVulnerableSoftware,
       },
     ],
     ({ queryKey }) => softwareAPI.getSoftwareVersions(queryKey[0]),
@@ -149,7 +140,7 @@ const SoftwareTitles = ({
         perPage={perPage}
         orderDirection={orderDirection}
         orderKey={orderKey}
-        softwareFilter={softwareFilter}
+        showVulnerableSoftware={showVulnerableSoftware}
         currentPage={currentPage}
         teamId={teamId}
         isLoading={isTitlesFetching || isVersionsFetching}

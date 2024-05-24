@@ -1,6 +1,6 @@
 import { useCallback, useContext, useEffect, useMemo } from "react";
 import { InjectedRouter } from "react-router";
-import { findLastIndex, over, trimStart } from "lodash";
+import { findLastIndex, trimStart } from "lodash";
 
 import { AppContext } from "context/app";
 import { TableContext } from "context/table";
@@ -16,30 +16,6 @@ import {
 import { IUser, IUserRole } from "interfaces/user";
 import permissions from "utilities/permissions";
 import sort from "utilities/sort";
-import { HOSTS_QUERY_PARAMS } from "services/entities/hosts";
-
-type OnTeamChangeFuncShouldStripParam = (
-  teamIdForApi: number | undefined
-) => boolean;
-
-type OnTeamChangeFuncShouldReplaceParam = (
-  teamIdForApi: number | undefined
-) => [boolean, string];
-
-/**
- * This type is used to define functions that determine whether a query parameter should be stripped or replaced
- * when the team id changes.
- *
- * The key is the name of the query parameter and the value is a function that receives the new team
- * id with a return type of either:
- *  - boolean indicating whether the query parameter should be stripped
- *  - tuple of a boolean and a string, where the boolean indicates whether the query parameter should be replaced
- *    and the string is the new value for the query parameter
- */
-export type IConfigOverrideParamsOnTeamChange = Record<
-  string,
-  OnTeamChangeFuncShouldReplaceParam | OnTeamChangeFuncShouldStripParam
->;
 
 const splitQueryStringParts = (queryString: string) =>
   trimStart(queryString, "?")
@@ -51,8 +27,7 @@ const joinQueryStringParts = (parts: string[]) =>
 
 const rebuildQueryStringWithTeamId = (
   queryString: string,
-  newTeamId: number,
-  configAdditionalParams?: IConfigOverrideParamsOnTeamChange
+  newTeamId: number
 ) => {
   const parts = splitQueryStringParts(queryString);
 
@@ -90,41 +65,6 @@ const rebuildQueryStringWithTeamId = (
     parts.splice(teamIndex, 1, newTeamPart); // remove the old part and replace with the new
   } else {
     parts.splice(teamIndex, 1); // just remove the old team part
-  }
-
-  if (configAdditionalParams) {
-    Object.entries(configAdditionalParams).forEach(([paramName, fn]) => {
-      let shouldStrip = false;
-      let shouldReplace = false;
-      let replaceString = "";
-
-      const val = fn(newTeamId);
-      if (Array.isArray(val)) {
-        [shouldReplace, replaceString] = val;
-      } else if (typeof val === "boolean") {
-        shouldStrip = val;
-      }
-
-      if (shouldStrip || shouldReplace) {
-        const paramIndex = parts.findIndex((p) =>
-          p.startsWith(`${paramName}=`)
-        );
-
-        if (shouldStrip && paramIndex !== -1) {
-          parts.splice(paramIndex, 1);
-          return;
-        }
-
-        if (shouldReplace) {
-          const newPart = `${paramName}=${replaceString}`;
-          if (paramIndex === -1) {
-            parts.splice(paramIndex, 1, newPart);
-          } else {
-            parts.push(newPart);
-          }
-        }
-      }
-    });
   }
 
   return joinQueryStringParts(parts);
@@ -283,7 +223,6 @@ export const useTeamIdParam = ({
   includeNoTeam,
   permittedAccessByTeamRole,
   resetSelectedRowsOnTeamChange = true,
-  overrideParamsOnTeamChange,
 }: {
   location?: {
     pathname: string;
@@ -296,7 +235,6 @@ export const useTeamIdParam = ({
   includeNoTeam: boolean;
   permittedAccessByTeamRole?: Record<IUserRole, boolean>;
   resetSelectedRowsOnTeamChange?: boolean;
-  overrideParamsOnTeamChange?: IConfigOverrideParamsOnTeamChange;
 }) => {
   const { hash, pathname, query, search } = location;
   const {
@@ -344,18 +282,11 @@ export const useTeamIdParam = ({
 
       router.replace(
         pathname
-          .concat(
-            rebuildQueryStringWithTeamId(
-              search,
-              teamId,
-              overrideParamsOnTeamChange
-            )
-          )
+          .concat(rebuildQueryStringWithTeamId(search, teamId))
           .concat(hash || "")
       );
     },
     [
-      overrideParamsOnTeamChange,
       resetSelectedRowsOnTeamChange,
       router,
       pathname,

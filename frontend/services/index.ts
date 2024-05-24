@@ -8,8 +8,7 @@ export const sendRequest = async (
   data?: unknown,
   responseType: AxiosResponseType = "json",
   timeout?: number,
-  skipParseError?: boolean,
-  returnRaw?: boolean
+  skipParseError?: boolean
 ) => {
   const { origin } = global.window.location;
 
@@ -28,9 +27,6 @@ export const sendRequest = async (
       },
     });
 
-    if (returnRaw) {
-      return response;
-    }
     return response.data;
   } catch (error) {
     if (skipParseError) {

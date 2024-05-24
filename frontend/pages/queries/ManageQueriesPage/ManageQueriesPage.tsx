@@ -183,22 +183,19 @@ const ManageQueriesPage = ({
     setSelectedQueryTargetsByType(DEFAULT_TARGETS_BY_TYPE);
   }, []);
 
-  const onCreateQueryClick = useCallback(() => {
+  const onCreateQueryClick = () => {
     setLastEditedQueryBody(DEFAULT_QUERY.query);
     router.push(PATHS.NEW_QUERY(currentTeamId));
-  }, [currentTeamId, router, setLastEditedQueryBody]);
+  };
 
   const toggleDeleteQueryModal = useCallback(() => {
     setShowDeleteQueryModal(!showDeleteQueryModal);
   }, [showDeleteQueryModal, setShowDeleteQueryModal]);
 
-  const onDeleteQueryClick = useCallback(
-    (selectedTableQueryIds: number[]) => {
-      toggleDeleteQueryModal();
-      setSelectedQueryIds(selectedTableQueryIds);
-    },
-    [toggleDeleteQueryModal, setSelectedQueryIds]
-  );
+  const onDeleteQueryClick = (selectedTableQueryIds: number[]) => {
+    toggleDeleteQueryModal();
+    setSelectedQueryIds(selectedTableQueryIds);
+  };
 
   const toggleManageAutomationsModal = useCallback(() => {
     setShowManageAutomationsModal(!showManageAutomationsModal);

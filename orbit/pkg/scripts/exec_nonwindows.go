@@ -12,7 +12,7 @@ import (
 	"github.com/fleetdm/fleet/v4/server/fleet"
 )
 
-func ExecCmd(ctx context.Context, scriptPath string, env []string) (output []byte, exitCode int, err error) {
+func execCmd(ctx context.Context, scriptPath string) (output []byte, exitCode int, err error) {
 	// initialize to -1 in case the process never starts
 	exitCode = -1
 
@@ -28,15 +28,11 @@ func ExecCmd(ctx context.Context, scriptPath string, env []string) (output []byt
 	cmd := exec.CommandContext(ctx, "/bin/sh", scriptPath)
 
 	if directExecute {
-		err = os.Chmod(scriptPath, 0700)
+		err = os.Chmod(scriptPath, 0766)
 		if err != nil {
 			return nil, -1, ctxerr.Wrapf(ctx, err, "marking script as executable %s", scriptPath)
 		}
 		cmd = exec.CommandContext(ctx, scriptPath)
-	}
-
-	if env != nil {
-		cmd.Env = env
 	}
 
 	cmd.Dir = filepath.Dir(scriptPath)

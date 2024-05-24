@@ -1,5 +1,5 @@
 import endpoints from "utilities/endpoints";
-import { IActivity, IHostActivity } from "interfaces/activity";
+import { IActivity, IPastActivity } from "interfaces/activity";
 import sendRequest from "services";
 import { buildQueryStringFromParams } from "utilities/url";
 
@@ -16,15 +16,15 @@ export interface IActivitiesResponse {
   };
 }
 
-export interface IHostActivitiesResponse {
-  activities: IHostActivity[] | null;
+export interface IPastActivitiesResponse {
+  activities: IPastActivity[] | null;
   meta: {
     has_next_results: boolean;
     has_previous_results: boolean;
   };
 }
 
-export interface IUpcomingActivitiesResponse extends IHostActivitiesResponse {
+export interface IUpcomingActivitiesResponse extends IActivitiesResponse {
   count: number;
 }
 
@@ -53,7 +53,7 @@ export default {
     id: number,
     page = DEFAULT_PAGE,
     perPage = DEFAULT_PAGE_SIZE
-  ): Promise<IHostActivitiesResponse> => {
+  ): Promise<IPastActivitiesResponse> => {
     const { HOST_PAST_ACTIVITIES } = endpoints;
 
     const queryParams = {

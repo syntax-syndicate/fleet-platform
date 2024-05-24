@@ -297,7 +297,7 @@ func downloadComponents(workflowName string, headBranch string, artifactNames ma
 			} else if *artifact.Name == artifactNames["windows"] {
 				urls["windows"] = *artifact.ArchiveDownloadURL
 			} else {
-				fmt.Printf("skipping artifact name: %q\n", *artifact.Name)
+				return fmt.Errorf("unknown artifact name: %s", *artifact.Name)
 			}
 		}
 		if len(urls) == 3 || !retry {

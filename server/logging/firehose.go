@@ -37,7 +37,7 @@ type firehoseLogWriter struct {
 	logger log.Logger
 }
 
-func NewFirehoseLogWriter(region, endpointURL, id, secret, stsAssumeRoleArn, stsExternalID, stream string, logger log.Logger) (*firehoseLogWriter, error) {
+func NewFirehoseLogWriter(region, endpointURL, id, secret, stsAssumeRoleArn, stream string, logger log.Logger) (*firehoseLogWriter, error) {
 	conf := &aws.Config{
 		Region:   &region,
 		Endpoint: &endpointURL, // empty string or nil will use default values
@@ -55,11 +55,7 @@ func NewFirehoseLogWriter(region, endpointURL, id, secret, stsAssumeRoleArn, sts
 	}
 
 	if stsAssumeRoleArn != "" {
-		creds := stscreds.NewCredentials(sess, stsAssumeRoleArn, func(provider *stscreds.AssumeRoleProvider) {
-			if stsExternalID != "" {
-				provider.ExternalID = &stsExternalID
-			}
-		})
+		creds := stscreds.NewCredentials(sess, stsAssumeRoleArn)
 		conf.Credentials = creds
 
 		sess, err = session.NewSession(conf)

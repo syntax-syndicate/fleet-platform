@@ -23,7 +23,6 @@ import hostsAPI, {
   ILoadHostsResponse,
   ISortOption,
   MacSettingsStatusQueryParam,
-  HOSTS_QUERY_PARAMS,
 } from "services/entities/hosts";
 import hostCountAPI, {
   IHostsCountQueryKey,
@@ -50,11 +49,7 @@ import { getErrorReason } from "interfaces/errors";
 import { ILabel } from "interfaces/label";
 import { IOperatingSystemVersion } from "interfaces/operating_system";
 import { IPolicy, IStoredPolicyResponse } from "interfaces/policy";
-import {
-  isValidSoftwareInstallStatus,
-  SoftwareInstallStatus,
-} from "interfaces/software";
-import { API_NO_TEAM_ID, ITeam } from "interfaces/team";
+import { ITeam } from "interfaces/team";
 import { IEmptyTableProps } from "interfaces/empty_table";
 import {
   DiskEncryptionStatus,
@@ -167,11 +162,6 @@ const ManageHostsPage = ({
     router,
     includeAllTeams: true,
     includeNoTeam: true,
-    overrideParamsOnTeamChange: {
-      // remove the software status filter when selecting all teams or no team
-      [HOSTS_QUERY_PARAMS.SOFTWARE_STATUS]: (newTeamId?: number) =>
-        !newTeamId || newTeamId < 1,
-    },
   });
 
   const hostHiddenColumns = localStorage.getItem("hostHiddenColumns");
@@ -242,11 +232,6 @@ const ManageHostsPage = ({
     queryParams?.software_title_id !== undefined
       ? parseInt(queryParams.software_title_id, 10)
       : undefined;
-  const softwareStatus = isValidSoftwareInstallStatus(
-    queryParams?.[HOSTS_QUERY_PARAMS.SOFTWARE_STATUS]
-  )
-    ? (queryParams[HOSTS_QUERY_PARAMS.SOFTWARE_STATUS] as SoftwareInstallStatus)
-    : undefined;
   const status = isAcceptableStatus(queryParams?.status)
     ? queryParams?.status
     : undefined;
@@ -395,7 +380,6 @@ const ManageHostsPage = ({
         softwareId,
         softwareTitleId,
         softwareVersionId,
-        softwareStatus,
         status,
         mdmId,
         mdmEnrollmentStatus,
@@ -439,7 +423,6 @@ const ManageHostsPage = ({
         softwareId,
         softwareTitleId,
         softwareVersionId,
-        softwareStatus,
         status,
         mdmId,
         mdmEnrollmentStatus,
@@ -534,10 +517,10 @@ const ManageHostsPage = ({
   useEffect(() => {
     if (
       location.search.match(
-        /software_id|software_version_id|software_title_id|software_status/gi
+        /software_id|software_version_id|software_title_id/gi
       )
     ) {
-      // regex matches any of "software_id", "software_version_id", "software_title_id", or "software_status"
+      // regex matches any of "software_id", "software_version_id", or "software_title_id"
       // so we don't set the filtered hosts path in those cases
       return;
     }
@@ -729,25 +712,6 @@ const ManageHostsPage = ({
     );
   };
 
-  const handleSoftwareInstallStatausChange = (
-    newStatus: SoftwareInstallStatus
-  ) => {
-    handleResetPageIndex();
-
-    router.replace(
-      getNextLocationPath({
-        pathPrefix: PATHS.MANAGE_HOSTS,
-        routeTemplate,
-        routeParams,
-        queryParams: {
-          ...queryParams,
-          [HOSTS_QUERY_PARAMS.SOFTWARE_STATUS]: newStatus,
-          page: 0, // resets page index
-        },
-      })
-    );
-  };
-
   const onAddLabelClick = () => {
     router.push(`${PATHS.NEW_LABEL}`);
   };
@@ -851,10 +815,6 @@ const ManageHostsPage = ({
         newQueryParams.software_version_id = softwareVersionId;
       } else if (softwareTitleId) {
         newQueryParams.software_title_id = softwareTitleId;
-        if (softwareStatus && teamIdForApi && teamIdForApi > 0) {
-          // software_status is only valid when software_title_id is present and a team is selected
-          newQueryParams[HOSTS_QUERY_PARAMS.SOFTWARE_STATUS] = softwareStatus;
-        }
       } else if (mdmId) {
         newQueryParams.mdm_id = mdmId;
       } else if (mdmEnrollmentStatus) {
@@ -904,7 +864,6 @@ const ManageHostsPage = ({
       softwareId,
       softwareVersionId,
       softwareTitleId,
-      softwareStatus,
       mdmId,
       mdmEnrollmentStatus,
       munkiIssueId,
@@ -1103,7 +1062,6 @@ const ManageHostsPage = ({
           softwareId,
           softwareTitleId,
           softwareVersionId,
-          softwareStatus,
           osName,
           osVersionId,
           osVersion,
@@ -1156,7 +1114,6 @@ const ManageHostsPage = ({
             softwareId,
             softwareTitleId,
             softwareVersionId,
-            softwareStatus,
             osName,
             osVersionId,
             osVersion,
@@ -1368,7 +1325,6 @@ const ManageHostsPage = ({
       softwareId,
       softwareTitleId,
       softwareVersionId,
-      softwareStatus,
       status,
       mdmId,
       mdmEnrollmentStatus,
@@ -1571,7 +1527,6 @@ const ManageHostsPage = ({
       softwareId ||
       softwareTitleId ||
       softwareVersionId ||
-      softwareStatus ||
       osName ||
       osVersionId ||
       osVersion ||
@@ -1710,7 +1665,6 @@ const ManageHostsPage = ({
               softwareId,
               softwareTitleId,
               softwareVersionId,
-              softwareStatus,
               mdmId,
               mdmEnrollmentStatus,
               lowDiskSpaceHosts,
@@ -1742,9 +1696,6 @@ const ManageHostsPage = ({
               handleChangeBootstrapPackageStatusFilter
             }
             onChangeMacSettingsFilter={handleMacSettingsStatusDropdownChange}
-            onChangeSoftwareInstallStatusFilter={
-              handleSoftwareInstallStatausChange
-            }
             onClickEditLabel={onEditLabelClick}
             onClickDeleteLabel={toggleDeleteLabelModal}
             isSandboxMode={isSandboxMode}

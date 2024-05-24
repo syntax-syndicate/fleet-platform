@@ -21,6 +21,10 @@ export interface ITableQueryData {
   searchQuery: string;
   sortHeader: string;
   sortDirection: string;
+  /**  Only used for showing inherited policies table */
+  showInheritedTable?: boolean;
+  /** Only used for sort/query changes to inherited policies table */
+  editingInheritedTable?: boolean;
 }
 interface IRowProps extends Row {
   original: {
@@ -64,14 +68,9 @@ interface ITableContainerProps<T = any> {
   primarySelectAction?: IActionButtonProps;
   /** Secondary button/s after selecting a row */
   secondarySelectActions?: IActionButtonProps[]; // TODO: Combine with primarySelectAction as these are all rendered in the same spot
-  /**
-   * @deprecated please use renderCount instead
-   * */
   filteredCount?: number;
   searchToolTipText?: string;
-  // TODO - consolidate this functionality within `filters`
   searchQueryColumn?: string;
-  // TODO - consolidate this functionality within `filters`
   selectedDropdownFilter?: string;
   isClientSidePagination?: boolean;
   /** Used to set URL to correct path and include page query param */
@@ -216,6 +215,10 @@ const TableContainer = <T,>({
       onPaginationChange(0);
     }
   }, [resetPageIndex, pageIndex, isClientSidePagination]);
+
+  const onResultsCountChange = useCallback((resultsCount: number) => {
+    setClientFilterCount(resultsCount);
+  }, []);
 
   useDeepEffect(() => {
     if (!onQueryChange) {
@@ -445,7 +448,7 @@ const TableContainer = <T,>({
                 secondarySelectActions={secondarySelectActions}
                 onSelectSingleRow={onSelectSingleRow}
                 onClickRow={onClickRow}
-                onResultsCountChange={setClientFilterCount}
+                onResultsCountChange={onResultsCountChange}
                 isClientSidePagination={isClientSidePagination}
                 onClientSidePaginationChange={onClientSidePaginationChange}
                 isClientSideFilter={isClientSideFilter}

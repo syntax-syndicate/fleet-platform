@@ -22,11 +22,14 @@ const (
 	nudgeConfigFileMode = os.FileMode(constant.DefaultWorldReadableFileMode)
 )
 
-// NudgeConfigReceiver is a kind of middleware that wraps an OrbitConfigFetcher and a Runner.
+// NudgeConfigFetcher is a kind of middleware that wraps an OrbitConfigFetcher and a Runner.
 // It checks the config supplied by the wrapped OrbitConfigFetcher to detects whether the Fleet
 // server has supplied a Nudge config. If so, it sets Nudge as a target on the wrapped Runner.
-type NudgeConfigReceiver struct {
-	opt NudgeConfigFetcherOptions
+type NudgeConfigFetcher struct {
+	// Fetcher is the OrbitConfigFetcher that will be wrapped. It is responsible
+	// for actually returning the orbit configuration or an error.
+	Fetcher OrbitConfigFetcher
+	opt     NudgeConfigFetcherOptions
 	// ensures only one command runs at a time, protects access to lastRun
 	cmdMu   sync.Mutex
 	lastRun time.Time
@@ -50,8 +53,8 @@ type NudgeConfigFetcherOptions struct {
 	runNudgeFn func(execPath, configPath string) error
 }
 
-func ApplyNudgeConfigReceiverMiddleware(opt NudgeConfigFetcherOptions) fleet.OrbitConfigReceiver {
-	return &NudgeConfigReceiver{opt: opt}
+func ApplyNudgeConfigFetcherMiddleware(f OrbitConfigFetcher, opt NudgeConfigFetcherOptions) OrbitConfigFetcher {
+	return &NudgeConfigFetcher{Fetcher: f, opt: opt}
 }
 
 // GetConfig calls the wrapped Fetcher's GetConfig method, and detects if the
@@ -62,17 +65,22 @@ func ApplyNudgeConfigReceiverMiddleware(opt NudgeConfigFetcherOptions) fleet.Orb
 // - ensures that Nudge is installed and updated via the designated TUF server.
 // - ensures that Nudge is opened at an interval given by n.frequency with the
 // provided config.
-func (n *NudgeConfigReceiver) Run(cfg *fleet.OrbitConfig) error {
+func (n *NudgeConfigFetcher) GetConfig() (*fleet.OrbitConfig, error) {
 	log.Debug().Msg("running nudge config fetcher middleware")
+	cfg, err := n.Fetcher.GetConfig()
+	if err != nil {
+		log.Debug().Err(err).Msg("calling GetConfig from NudgeConfigFetcher")
+		return nil, err
+	}
 
 	if cfg == nil {
-		log.Debug().Msg("NudgeConfigReceiver received nil config")
-		return nil
+		log.Debug().Msg("NudgeConfigFetcher received nil config")
+		return nil, nil
 	}
 
 	if n.opt.UpdateRunner == nil {
-		log.Debug().Msg("NudgeConfigReceiver received nil UpdateRunner, this probably indicates that updates are turned off. Skipping any actions related to Nudge")
-		return nil
+		log.Debug().Msg("NudgeConfigFetcher received nil UpdateRunner, this probably indicates that updates are turned off. Skipping any actions related to Nudge")
+		return cfg, nil
 	}
 
 	if cfg.NudgeConfig == nil {
@@ -83,7 +91,7 @@ func (n *NudgeConfigReceiver) Run(cfg *fleet.OrbitConfig) error {
 		// knowingly decided to do this as a post MVP optimization.
 		n.opt.UpdateRunner.RemoveRunnerOptTarget("nudge")
 		n.opt.UpdateRunner.updater.RemoveTargetInfo("nudge")
-		return nil
+		return cfg, nil
 	}
 
 	updaterHasTarget := n.opt.UpdateRunner.HasRunnerOptTarget("nudge")
@@ -91,23 +99,23 @@ func (n *NudgeConfigReceiver) Run(cfg *fleet.OrbitConfig) error {
 	if !updaterHasTarget || !runnerHasLocalHash {
 		log.Info().Msg("refreshing the update runner config with Nudge targets and hashes")
 		log.Debug().Msgf("updater has target: %t, runner has local hash: %t", updaterHasTarget, runnerHasLocalHash)
-		return n.setTargetsAndHashes()
+		return cfg, n.setTargetsAndHashes()
 	}
 
 	if err := n.configure(*cfg.NudgeConfig); err != nil {
 		log.Info().Err(err).Msg("nudge configuration")
-		return err
+		return cfg, err
 	}
 
 	if err := n.launch(); err != nil {
 		log.Info().Err(err).Msg("nudge launch")
-		return err
+		return cfg, err
 	}
 
-	return nil
+	return cfg, nil
 }
 
-func (n *NudgeConfigReceiver) setTargetsAndHashes() error {
+func (n *NudgeConfigFetcher) setTargetsAndHashes() error {
 	n.opt.UpdateRunner.AddRunnerOptTarget("nudge")
 	n.opt.UpdateRunner.updater.SetTargetInfo("nudge", NudgeMacOSTarget)
 	// we don't want to keep nudge as a target if we failed to update the
@@ -121,7 +129,7 @@ func (n *NudgeConfigReceiver) setTargetsAndHashes() error {
 	return nil
 }
 
-func (n *NudgeConfigReceiver) configure(nudgeCfg fleet.NudgeConfig) error {
+func (n *NudgeConfigFetcher) configure(nudgeCfg fleet.NudgeConfig) error {
 	jsonCfg, err := json.Marshal(nudgeCfg)
 	if err != nil {
 		return err
@@ -172,7 +180,7 @@ func (n *NudgeConfigReceiver) configure(nudgeCfg fleet.NudgeConfig) error {
 	return nil
 }
 
-func (n *NudgeConfigReceiver) launch() error {
+func (n *NudgeConfigFetcher) launch() error {
 	cfgFile := filepath.Join(n.opt.RootDir, nudgeConfigFile)
 
 	if n.cmdMu.TryLock() {

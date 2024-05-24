@@ -1,30 +1,28 @@
-import React, { useCallback, useContext, useMemo, useState } from "react";
+import React, { useCallback, useContext, useMemo } from "react";
 import { InjectedRouter } from "react-router";
-import { useQuery } from "react-query";
-import { AxiosError } from "axios";
-import { trimEnd, upperFirst } from "lodash";
+import { Row } from "react-table";
+import PATHS from "router/paths";
+import { isEmpty } from "lodash";
 
-import hostAPI, {
-  IGetHostSoftwareResponse,
-  IHostSoftwareQueryKey,
-} from "services/entities/hosts";
-import deviceAPI, {
-  IDeviceSoftwareQueryKey,
-  IGetDeviceSoftwareResponse,
-} from "services/entities/device_user";
-import { getErrorReason } from "interfaces/errors";
-import { IHostSoftware, ISoftware } from "interfaces/software";
-import { DEFAULT_USE_QUERY_OPTIONS } from "utilities/constants";
-import { NotificationContext } from "context/notification";
 import { AppContext } from "context/app";
+import { ISoftware } from "interfaces/software";
+import { VULNERABLE_DROPDOWN_OPTIONS } from "utilities/constants";
+import { buildQueryStringFromParams } from "utilities/url";
 
-import Card from "components/Card/Card";
-import DataError from "components/DataError";
-import Spinner from "components/Spinner";
+// @ts-ignore
+import Dropdown from "components/forms/fields/Dropdown";
+import TableContainer from "components/TableContainer";
+import { ITableQueryData } from "components/TableContainer/TableContainer";
+import Card from "components/Card";
+import EmptySoftwareTable from "pages/SoftwarePage/components/EmptySoftwareTable";
+import { getNextLocationPath } from "utilities/helpers";
 
-import { generateSoftwareTableHeaders as generateHostSoftwareTableConfig } from "./HostSoftwareTableConfig";
-import { generateSoftwareTableHeaders as generateDeviceSoftwareTableConfig } from "./DeviceSoftwareTableConfig";
-import HostSoftwareTable from "./HostSoftwareTable";
+import SoftwareVulnCount from "./SoftwareVulnCount";
+
+import {
+  generateSoftwareTableHeaders,
+  generateSoftwareTableData,
+} from "./SoftwareTableConfig";
 
 const baseClass = "software-card";
 
@@ -32,211 +30,181 @@ export interface ITableSoftware extends Omit<ISoftware, "vulnerabilities"> {
   vulnerabilities: string[]; // for client-side search purposes, we only want an array of cve strings
 }
 
-interface ISoftwareCardProps {
-  /** This is the host id or the device token */
-  id: number | string;
-  isFleetdHost: boolean;
-  router: InjectedRouter;
-  queryParams: ReturnType<typeof parseHostSoftwareQueryParams>;
-  pathname: string;
-  /** Team id for the host */
-  teamId: number;
-  onShowSoftwareDetails?: (software: IHostSoftware) => void;
+interface ISoftwareTableProps {
+  isLoading: boolean;
+  software: ISoftware[];
+  deviceUser?: boolean;
+  deviceType?: string;
   isSoftwareEnabled?: boolean;
-  isMyDevicePage?: boolean;
+  router?: InjectedRouter;
+  queryParams?: {
+    vulnerable?: string;
+    page?: string;
+    query?: string;
+    order_key?: string;
+    order_direction?: "asc" | "desc";
+  };
+  routeTemplate?: string;
+  pathname: string;
+  pathPrefix: string;
 }
 
-const DEFAULT_SEARCH_QUERY = "";
-const DEFAULT_SORT_DIRECTION = "asc";
+interface IRowProps extends Row {
+  original: {
+    id?: number;
+  };
+  isSoftwareEnabled?: boolean;
+}
+
+const DEFAULT_SORT_DIRECTION = "desc";
 const DEFAULT_SORT_HEADER = "name";
-const DEFAULT_PAGE = 0;
 const DEFAULT_PAGE_SIZE = 20;
 
-export const parseHostSoftwareQueryParams = (queryParams: {
-  page?: string;
-  query?: string;
-  order_key?: string;
-  order_direction?: "asc" | "desc";
-}) => {
-  const searchQuery = queryParams?.query ?? DEFAULT_SEARCH_QUERY;
-  const sortHeader = queryParams?.order_key ?? DEFAULT_SORT_HEADER;
-  const sortDirection = queryParams?.order_direction ?? DEFAULT_SORT_DIRECTION;
-  const page = queryParams?.page
-    ? parseInt(queryParams.page, 10)
-    : DEFAULT_PAGE;
-  const pageSize = DEFAULT_PAGE_SIZE;
-
-  return {
-    page,
-    query: searchQuery,
-    order_key: sortHeader,
-    order_direction: sortDirection,
-    per_page: pageSize,
-  };
-};
-
-const SoftwareCard = ({
-  id,
-  isFleetdHost,
+const SoftwareTable = ({
+  isLoading,
+  software,
+  deviceUser,
+  deviceType,
   router,
   queryParams,
+  routeTemplate,
+  pathPrefix,
   pathname,
-  teamId = 0,
-  onShowSoftwareDetails,
-  isSoftwareEnabled = false,
-  isMyDevicePage = false,
-}: ISoftwareCardProps) => {
-  const { renderFlash } = useContext(NotificationContext);
-  const {
-    isGlobalAdmin,
-    isGlobalMaintainer,
-    isTeamAdmin,
-    isTeamMaintainer,
-  } = useContext(AppContext);
+}: ISoftwareTableProps): JSX.Element => {
+  const { isSandboxMode, setFilteredSoftwarePath } = useContext(AppContext);
 
-  const [installingSoftwareId, setInstallingSoftwareId] = useState<
-    number | null
-  >(null);
+  // Functions to avoid race conditions
+  const initialSearchQuery = (() => queryParams?.query ?? "")();
+  const initialSortHeader = (() => queryParams?.order_key ?? "name")();
+  const initialSortDirection = (() =>
+    (queryParams?.order_direction as "asc" | "desc") ?? "asc")();
+  const initialVulnFilter = (() => queryParams?.vulnerable === "true")();
+  const initialPage = (() =>
+    queryParams && queryParams.page ? parseInt(queryParams?.page, 10) : 0)();
 
-  const {
-    data: hostSoftwareRes,
-    isLoading: hostSoftwareLoading,
-    isError: hostSoftwareError,
-    isFetching: hostSoftwareFetching,
-    refetch: refetchHostSoftware,
-  } = useQuery<
-    IGetHostSoftwareResponse,
-    AxiosError,
-    IGetHostSoftwareResponse,
-    IHostSoftwareQueryKey[]
-  >(
-    [
-      {
-        scope: "host_software",
-        id: id as number,
-        ...queryParams,
-      },
-    ],
-    ({ queryKey }) => {
-      return hostAPI.getHostSoftware(queryKey[0]);
-    },
-    {
-      ...DEFAULT_USE_QUERY_OPTIONS,
-      enabled: isSoftwareEnabled && !isMyDevicePage, // if disabled, we'll always show a generic "No software detected" message
-      keepPreviousData: true,
-      staleTime: 7000,
-    }
-  );
+  // Never set as state as URL is source of truth
+  const searchQuery = initialSearchQuery;
+  const filterVuln = initialVulnFilter;
+  const page = initialPage;
+  const sortDirection = initialSortDirection;
+  const sortHeader = initialSortHeader;
 
-  const {
-    data: deviceSoftwareRes,
-    isLoading: deviceSoftwareLoading,
-    isError: deviceSoftwareError,
-    isFetching: deviceSoftwareFetching,
-    refetch: refetchDeviceSoftware,
-  } = useQuery<
-    IGetDeviceSoftwareResponse,
-    AxiosError,
-    IGetDeviceSoftwareResponse,
-    IDeviceSoftwareQueryKey[]
-  >(
-    [
-      {
-        scope: "device_software",
-        id: id as string,
-        ...queryParams,
-      },
-    ],
-    ({ queryKey }) => deviceAPI.getDeviceSoftware(queryKey[0]),
-    {
-      ...DEFAULT_USE_QUERY_OPTIONS,
-      enabled: isSoftwareEnabled && isMyDevicePage,
-      keepPreviousData: true,
-      staleTime: 7000,
-    }
-  );
+  // TODO: Look into useDebounceCallback with dependencies
+  const onQueryChange = useCallback(
+    async (newTableQuery: ITableQueryData) => {
+      const {
+        pageIndex: newPageIndex,
+        searchQuery: newSearchQuery,
+        sortDirection: newSortDirection,
+        sortHeader: newSortHeader,
+      } = newTableQuery;
 
-  const refetchSoftware = useMemo(
-    () => (isMyDevicePage ? refetchDeviceSoftware : refetchHostSoftware),
-    [isMyDevicePage, refetchDeviceSoftware, refetchHostSoftware]
-  );
+      // Rebuild queryParams to dispatch new browser location to react-router
+      const newQueryParams: { [key: string]: string | number | undefined } = {};
 
-  const canInstallSoftware = Boolean(
-    isGlobalAdmin || isGlobalMaintainer || isTeamAdmin || isTeamMaintainer
-  );
-
-  const installHostSoftwarePackage = useCallback(
-    async (softwareId: number) => {
-      setInstallingSoftwareId(softwareId);
-      try {
-        await hostAPI.installHostSoftwarePackage(id as number, softwareId);
-        renderFlash(
-          "success",
-          "Software is installing or will install when the host comes online."
-        );
-      } catch (e) {
-        const reason = upperFirst(trimEnd(getErrorReason(e), "."));
-        if (reason.includes("fleetd installed")) {
-          renderFlash("error", `Couldn't install. ${reason}.`);
-        } else if (reason.includes("can be installed only on")) {
-          renderFlash(
-            "error",
-            `Couldn't install. ${reason.replace("darwin", "macOS")}.`
-          );
-        } else {
-          renderFlash("error", "Couldn't install. Please try again.");
-        }
+      if (!isEmpty(newSearchQuery)) {
+        newQueryParams.query = newSearchQuery;
       }
-      setInstallingSoftwareId(null);
-      refetchSoftware();
-    },
-    [id, renderFlash, refetchSoftware]
-  );
 
-  const onSelectAction = useCallback(
-    (software: IHostSoftware, action: string) => {
-      switch (action) {
-        case "install":
-          installHostSoftwarePackage(software.id);
-          break;
-        case "showDetails":
-          onShowSoftwareDetails?.(software);
-          break;
-        default:
-          break;
+      newQueryParams.order_key = newSortHeader || DEFAULT_SORT_HEADER;
+      newQueryParams.order_direction =
+        newSortDirection || DEFAULT_SORT_DIRECTION;
+      newQueryParams.vulnerable = filterVuln ? "true" : "false"; // must set from URL
+      newQueryParams.page = newPageIndex;
+      // Reset page number to 0 for new filters
+      if (
+        newSortDirection !== sortDirection ||
+        newSortHeader !== sortHeader ||
+        newSearchQuery !== searchQuery
+      ) {
+        newQueryParams.page = 0;
       }
+
+      const locationPath = getNextLocationPath({
+        pathPrefix,
+        routeTemplate,
+        queryParams: newQueryParams,
+      });
+
+      router?.replace(locationPath);
     },
-    [installHostSoftwarePackage, onShowSoftwareDetails]
+    [sortHeader, sortDirection, searchQuery, filterVuln, router, routeTemplate]
   );
 
-  const tableConfig = useMemo(() => {
-    return isMyDevicePage
-      ? generateDeviceSoftwareTableConfig()
-      : generateHostSoftwareTableConfig({
-          router,
-          installingSoftwareId,
-          canInstall: canInstallSoftware,
-          onSelectAction,
-          teamId,
-          isFleetdHost,
-        });
-  }, [
-    isMyDevicePage,
-    router,
-    installingSoftwareId,
-    canInstallSoftware,
-    onSelectAction,
-    teamId,
-    isFleetdHost,
+  const onClientSidePaginationChange = useCallback(
+    (pageIndex: number) => {
+      const locationPath = getNextLocationPath({
+        pathPrefix,
+        routeTemplate,
+        queryParams: {
+          ...queryParams,
+          page: pageIndex,
+          vulnerable: filterVuln ? "true" : "false",
+          query: searchQuery,
+          order_direction: sortDirection,
+          order_key: sortHeader,
+        },
+      });
+      router?.replace(locationPath);
+    },
+    [filterVuln, searchQuery, sortDirection, sortHeader] // Dependencies required for correct variable state
+  );
+
+  const tableSoftware = useMemo(() => generateSoftwareTableData(software), [
+    software,
   ]);
+  const tableHeaders = useMemo(
+    () =>
+      generateSoftwareTableHeaders({
+        deviceUser,
+        router,
+        setFilteredSoftwarePath,
+        pathname,
+      }),
+    [deviceUser, router, pathname]
+  );
 
-  const isLoading = isMyDevicePage
-    ? deviceSoftwareLoading
-    : hostSoftwareLoading;
+  const handleVulnFilterDropdownChange = (isFilterVulnerable: boolean) => {
+    const nextPath = getNextLocationPath({
+      pathPrefix,
+      routeTemplate,
+      queryParams: {
+        ...queryParams,
+        page: 0,
+        vulnerable: isFilterVulnerable.toString(),
+      },
+    });
+    router?.replace(nextPath);
+  };
 
-  const isError = isMyDevicePage ? deviceSoftwareError : hostSoftwareError;
+  const handleRowSelect = (row: IRowProps) => {
+    if (deviceUser || !router) {
+      return;
+    }
 
-  const data = isMyDevicePage ? deviceSoftwareRes : hostSoftwareRes;
+    const hostsBySoftwareParams = { software_id: row.original.id };
+
+    const path = hostsBySoftwareParams
+      ? `${PATHS.MANAGE_HOSTS}?${buildQueryStringFromParams(
+          hostsBySoftwareParams
+        )}`
+      : PATHS.MANAGE_HOSTS;
+
+    router.push(path);
+  };
+
+  const renderVulnFilterDropdown = () => {
+    return (
+      <Dropdown
+        value={filterVuln}
+        className={`${baseClass}__vuln_dropdown`}
+        options={VULNERABLE_DROPDOWN_OPTIONS}
+        searchable={false}
+        onChange={handleVulnFilterDropdownChange}
+        tableFilterDropdown
+      />
+    );
+  };
 
   return (
     <Card
@@ -246,30 +214,60 @@ const SoftwareCard = ({
       className={baseClass}
     >
       <p className="card__header">Software</p>
-      {isLoading ? (
-        <Spinner />
-      ) : (
+
+      {software?.length ? (
         <>
-          {isError && <DataError />}
-          {!isError && (
-            <HostSoftwareTable
-              isLoading={
-                isMyDevicePage ? deviceSoftwareFetching : hostSoftwareFetching
-              }
-              data={data}
-              router={router}
-              tableConfig={tableConfig}
-              sortHeader={queryParams.order_key}
-              sortDirection={queryParams.order_direction}
-              searchQuery={queryParams.query}
-              page={queryParams.page}
-              pagePath={pathname}
+          {software && (
+            <SoftwareVulnCount
+              softwareList={software}
+              deviceUser={deviceUser}
             />
           )}
+          {software && (
+            <div className={deviceType || ""}>
+              <TableContainer
+                resultsTitle="software items"
+                columnConfigs={tableHeaders}
+                data={tableSoftware || []}
+                filters={{
+                  global: searchQuery,
+                  vulnerabilities: filterVuln,
+                }}
+                isLoading={isLoading}
+                defaultSortHeader={sortHeader || DEFAULT_SORT_HEADER}
+                defaultSortDirection={sortDirection || DEFAULT_SORT_DIRECTION}
+                defaultSearchQuery={searchQuery}
+                defaultPageIndex={page}
+                pageSize={DEFAULT_PAGE_SIZE}
+                inputPlaceHolder="Search by name or vulnerabilities (CVEs)"
+                onQueryChange={onQueryChange}
+                emptyComponent={() => (
+                  <EmptySoftwareTable
+                    isFilterVulnerable={filterVuln}
+                    isSearching={searchQuery !== ""}
+                    isSandboxMode={isSandboxMode}
+                  />
+                )}
+                showMarkAllPages={false}
+                isAllPagesSelected={false}
+                searchable
+                customControl={renderVulnFilterDropdown}
+                isClientSidePagination
+                onClientSidePaginationChange={onClientSidePaginationChange}
+                isClientSideFilter
+                disableMultiRowSelect={!deviceUser && !!router} // device user cannot view hosts by software
+                onSelectSingleRow={handleRowSelect}
+              />
+            </div>
+          )}
         </>
+      ) : (
+        <EmptySoftwareTable
+          isSandboxMode={isSandboxMode}
+          isFilterVulnerable={filterVuln}
+        />
       )}
     </Card>
   );
 };
-
-export default React.memo(SoftwareCard);
+export default SoftwareTable;

@@ -267,7 +267,11 @@ const SoftwareVulnerabilitiesTable = ({
         isLoading={isLoading}
         resultsTitle={"items"}
         emptyComponent={() => (
-          <EmptySoftwareTable isSoftwareDisabled={!isSoftwareEnabled} />
+          <EmptySoftwareTable
+            isSoftwareDisabled={!isSoftwareEnabled}
+            isSandboxMode={isSandboxMode}
+            noSandboxHosts={noSandboxHosts}
+          />
         )}
         defaultSortHeader={orderKey}
         defaultSortDirection={orderDirection}

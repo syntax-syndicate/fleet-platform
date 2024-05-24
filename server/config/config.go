@@ -243,7 +243,6 @@ type FirehoseConfig struct {
 	AccessKeyID      string `yaml:"access_key_id"`
 	SecretAccessKey  string `yaml:"secret_access_key"`
 	StsAssumeRoleArn string `yaml:"sts_assume_role_arn"`
-	StsExternalID    string `yaml:"sts_external_id"`
 	StatusStream     string `yaml:"status_stream"`
 	ResultStream     string `yaml:"result_stream"`
 	AuditStream      string `yaml:"audit_stream"`
@@ -256,7 +255,6 @@ type KinesisConfig struct {
 	AccessKeyID      string `yaml:"access_key_id"`
 	SecretAccessKey  string `yaml:"secret_access_key"`
 	StsAssumeRoleArn string `yaml:"sts_assume_role_arn"`
-	StsExternalID    string `yaml:"sts_external_id"`
 	StatusStream     string `yaml:"status_stream"`
 	ResultStream     string `yaml:"result_stream"`
 	AuditStream      string `yaml:"audit_stream"`
@@ -269,7 +267,6 @@ type SESConfig struct {
 	AccessKeyID      string `yaml:"access_key_id"`
 	SecretAccessKey  string `yaml:"secret_access_key"`
 	StsAssumeRoleArn string `yaml:"sts_assume_role_arn"`
-	StsExternalID    string `yaml:"sts_external_id"`
 	SourceArn        string `yaml:"source_arn"`
 }
 
@@ -283,7 +280,6 @@ type LambdaConfig struct {
 	AccessKeyID      string `yaml:"access_key_id"`
 	SecretAccessKey  string `yaml:"secret_access_key"`
 	StsAssumeRoleArn string `yaml:"sts_assume_role_arn"`
-	StsExternalID    string `yaml:"sts_external_id"`
 	StatusFunction   string `yaml:"status_function"`
 	ResultFunction   string `yaml:"result_function"`
 	AuditFunction    string `yaml:"audit_function"`
@@ -298,7 +294,6 @@ type S3Config struct {
 	AccessKeyID      string `yaml:"access_key_id"`
 	SecretAccessKey  string `yaml:"secret_access_key"`
 	StsAssumeRoleArn string `yaml:"sts_assume_role_arn"`
-	StsExternalID    string `yaml:"sts_external_id"`
 	DisableSSL       bool   `yaml:"disable_ssl"`
 	ForceS3PathStyle bool   `yaml:"force_s3_path_style"`
 }
@@ -953,7 +948,6 @@ func (man Manager) addConfigs() {
 	man.addConfigString("ses.access_key_id", "", "Access Key ID for AWS authentication")
 	man.addConfigString("ses.secret_access_key", "", "Secret Access Key for AWS authentication")
 	man.addConfigString("ses.sts_assume_role_arn", "", "ARN of role to assume for AWS")
-	man.addConfigString("ses.sts_external_id", "", "Optional unique identifier that can be used by the principal assuming the role to assert its identity.")
 	man.addConfigString("ses.source_arn", "", "ARN of the identity that is associated with the sending authorization policy that permits you to send for the email address specified in the Source parameter")
 
 	// Firehose
@@ -964,8 +958,6 @@ func (man Manager) addConfigs() {
 	man.addConfigString("firehose.secret_access_key", "", "Secret Access Key for AWS authentication")
 	man.addConfigString("firehose.sts_assume_role_arn", "",
 		"ARN of role to assume for AWS")
-	man.addConfigString("firehose.sts_external_id", "",
-		"Optional unique identifier that can be used by the principal assuming the role to assert its identity.")
 	man.addConfigString("firehose.status_stream", "",
 		"Firehose stream name for status logs")
 	man.addConfigString("firehose.result_stream", "",
@@ -981,8 +973,6 @@ func (man Manager) addConfigs() {
 	man.addConfigString("kinesis.secret_access_key", "", "Secret Access Key for AWS authentication")
 	man.addConfigString("kinesis.sts_assume_role_arn", "",
 		"ARN of role to assume for AWS")
-	man.addConfigString("kinesis.sts_external_id", "",
-		"Optional unique identifier that can be used by the principal assuming the role to assert its identity.")
 	man.addConfigString("kinesis.status_stream", "",
 		"Kinesis stream name for status logs")
 	man.addConfigString("kinesis.result_stream", "",
@@ -996,8 +986,6 @@ func (man Manager) addConfigs() {
 	man.addConfigString("lambda.secret_access_key", "", "Secret Access Key for AWS authentication")
 	man.addConfigString("lambda.sts_assume_role_arn", "",
 		"ARN of role to assume for AWS")
-	man.addConfigString("lambda.sts_external_id", "",
-		"Optional unique identifier that can be used by the principal assuming the role to assert its identity.")
 	man.addConfigString("lambda.status_function", "",
 		"Lambda function name for status logs")
 	man.addConfigString("lambda.result_function", "",
@@ -1013,7 +1001,6 @@ func (man Manager) addConfigs() {
 	man.addConfigString("s3.access_key_id", "", "Access Key ID for AWS authentication")
 	man.addConfigString("s3.secret_access_key", "", "Secret Access Key for AWS authentication")
 	man.addConfigString("s3.sts_assume_role_arn", "", "ARN of role to assume for AWS")
-	man.addConfigString("s3.sts_external_id", "", "Optional unique identifier that can be used by the principal assuming the role to assert its identity.")
 	man.addConfigBool("s3.disable_ssl", false, "Disable SSL (typically for local testing)")
 	man.addConfigBool("s3.force_s3_path_style", false, "Set this to true to force path-style addressing, i.e., `http://s3.amazonaws.com/BUCKET/KEY`")
 
@@ -1101,7 +1088,6 @@ func (man Manager) addConfigs() {
 	man.addConfigString("packaging.s3.access_key_id", "", "Access Key ID for AWS authentication")
 	man.addConfigString("packaging.s3.secret_access_key", "", "Secret Access Key for AWS authentication")
 	man.addConfigString("packaging.s3.sts_assume_role_arn", "", "ARN of role to assume for AWS")
-	man.addConfigString("packaging.s3.sts_external_id", "", "Optional unique identifier that can be used by the principal assuming the role to assert its identity.")
 	man.addConfigBool("packaging.s3.disable_ssl", false, "Disable SSL (typically for local testing)")
 	man.addConfigBool("packaging.s3.force_s3_path_style", false, "Set this to true to force path-style addressing, i.e., `http://s3.amazonaws.com/BUCKET/KEY`")
 
@@ -1267,7 +1253,6 @@ func (man Manager) LoadConfig() FleetConfig {
 			AccessKeyID:      man.getConfigString("firehose.access_key_id"),
 			SecretAccessKey:  man.getConfigString("firehose.secret_access_key"),
 			StsAssumeRoleArn: man.getConfigString("firehose.sts_assume_role_arn"),
-			StsExternalID:    man.getConfigString("firehose.sts_external_id"),
 			StatusStream:     man.getConfigString("firehose.status_stream"),
 			ResultStream:     man.getConfigString("firehose.result_stream"),
 			AuditStream:      man.getConfigString("firehose.audit_stream"),
@@ -1281,7 +1266,6 @@ func (man Manager) LoadConfig() FleetConfig {
 			ResultStream:     man.getConfigString("kinesis.result_stream"),
 			AuditStream:      man.getConfigString("kinesis.audit_stream"),
 			StsAssumeRoleArn: man.getConfigString("kinesis.sts_assume_role_arn"),
-			StsExternalID:    man.getConfigString("kinesis.sts_external_id"),
 		},
 		Lambda: LambdaConfig{
 			Region:           man.getConfigString("lambda.region"),
@@ -1291,7 +1275,6 @@ func (man Manager) LoadConfig() FleetConfig {
 			ResultFunction:   man.getConfigString("lambda.result_function"),
 			AuditFunction:    man.getConfigString("lambda.audit_function"),
 			StsAssumeRoleArn: man.getConfigString("lambda.sts_assume_role_arn"),
-			StsExternalID:    man.getConfigString("lambda.sts_external_id"),
 		},
 		S3: S3Config{
 			Bucket:           man.getConfigString("s3.bucket"),
@@ -1301,7 +1284,6 @@ func (man Manager) LoadConfig() FleetConfig {
 			AccessKeyID:      man.getConfigString("s3.access_key_id"),
 			SecretAccessKey:  man.getConfigString("s3.secret_access_key"),
 			StsAssumeRoleArn: man.getConfigString("s3.sts_assume_role_arn"),
-			StsExternalID:    man.getConfigString("s3.sts_external_id"),
 			DisableSSL:       man.getConfigBool("s3.disable_ssl"),
 			ForceS3PathStyle: man.getConfigBool("s3.force_s3_path_style"),
 		},
@@ -1314,7 +1296,6 @@ func (man Manager) LoadConfig() FleetConfig {
 			AccessKeyID:      man.getConfigString("ses.access_key_id"),
 			SecretAccessKey:  man.getConfigString("ses.secret_access_key"),
 			StsAssumeRoleArn: man.getConfigString("ses.sts_assume_role_arn"),
-			StsExternalID:    man.getConfigString("ses.sts_external_id"),
 			SourceArn:        man.getConfigString("ses.source_arn"),
 		},
 		PubSub: PubSubConfig{
@@ -1384,7 +1365,6 @@ func (man Manager) LoadConfig() FleetConfig {
 				AccessKeyID:      man.getConfigString("packaging.s3.access_key_id"),
 				SecretAccessKey:  man.getConfigString("packaging.s3.secret_access_key"),
 				StsAssumeRoleArn: man.getConfigString("packaging.s3.sts_assume_role_arn"),
-				StsExternalID:    man.getConfigString("packaging.s3.sts_external_id"),
 				DisableSSL:       man.getConfigBool("packaging.s3.disable_ssl"),
 				ForceS3PathStyle: man.getConfigBool("packaging.s3.force_s3_path_style"),
 			},

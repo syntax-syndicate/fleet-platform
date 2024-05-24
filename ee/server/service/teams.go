@@ -1085,10 +1085,6 @@ func (svc *Service) editTeamFromSpec(
 		team.Config.Scripts = spec.Scripts
 	}
 
-	if spec.Software.Set {
-		team.Config.Software = spec.Software
-	}
-
 	if len(secrets) > 0 {
 		team.Secrets = secrets
 	}

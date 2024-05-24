@@ -138,18 +138,24 @@ the account verification message.)`,
     .intercept({name: 'UsageError'}, 'invalid')
     .fetch();
 
-    // Use timers.setImmediate() to update/create CRM records in the background.
-    require('timers').setImmediate(async ()=>{
-      await sails.helpers.salesforce.updateOrCreateContactAndAccountAndCreateLead.with({
+    if(sails.config.environment === 'production') {
+      let recordIds = await sails.helpers.salesforce.updateOrCreateContactAndAccount.with({
         emailAddress: newEmailAddress,
         firstName: firstName,
         lastName: lastName,
         organization: organization,
-        leadSource: 'Website - Sign up',
-      }).tolerate((err)=>{
-        sails.log.warn(`Background task failed: When a user (email: ${newEmailAddress} sign up for a fleetdm.com account, a Contact, Account, and Lead record could not be created/updated in the CRM. Error:`, err.raw);
       });
-    });//_∏_  (Meanwhile...)
+
+      await sails.helpers.salesforce.createLead.with({
+        salesforceContactId: recordIds.salesforceContactId,
+        salesforceAccountId: recordIds.salesforceAccountId,
+        leadSource: 'Website - Sign up',
+      })
+      .tolerate((err)=>{
+        sails.log.warn(`When a user signed up, a lead could not be created in the CRM for this email address: ${newEmailAddress}. Error from create-lead helper: ${err}`);
+        return;
+      });
+    }
 
     // Store the user's new id in their session.
     this.req.session.userId = newUserRecord.id;

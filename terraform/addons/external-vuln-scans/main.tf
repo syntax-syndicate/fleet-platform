@@ -14,8 +14,7 @@ locals {
   ]
   secrets = [
     for k, v in merge(var.fleet_config.extra_secrets, {
-      FLEET_MYSQL_PASSWORD              = var.fleet_config.database.password_secret_arn
-      FLEET_MYSQL_READ_REPLICA_PASSWORD = var.fleet_config.database.password_secret_arn
+      FLEET_MYSQL_PASSWORD = var.fleet_config.database.password_secret_arn
       }) : {
       name      = k
       valueFrom = v
@@ -83,18 +82,6 @@ resource "aws_ecs_task_definition" "vuln-processing" {
         {
           name  = "FLEET_MYSQL_ADDRESS"
           value = var.fleet_config.database.address
-        },
-        {
-          name  = "FLEET_MYSQL_READ_REPLICA_USERNAME"
-          value = var.fleet_config.database.user
-        },
-        {
-          name  = "FLEET_MYSQL_READ_REPLICA_DATABASE"
-          value = var.fleet_config.database.database
-        },
-        {
-          name  = "FLEET_MYSQL_READ_REPLICA_ADDRESS"
-          value = var.fleet_config.database.rr_address == null ? var.fleet_config.database.address : var.fleet_config.database.rr_address
         },
         {
           name  = "FLEET_REDIS_ADDRESS"
