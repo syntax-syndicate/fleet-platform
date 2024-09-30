@@ -34,6 +34,8 @@ import (
 const (
 	// SCEPPath is Fleet's HTTP path for the SCEP service.
 	SCEPPath = "/mdm/apple/scep"
+	// SCEPProxyPath is Fleet's HTTP path for the SCEP proxy service.
+	SCEPProxyPath = "/mdm/scep/proxy"
 	// MDMPath is Fleet's HTTP path for the core MDM service.
 	MDMPath = "/mdm/apple/mdm"
 

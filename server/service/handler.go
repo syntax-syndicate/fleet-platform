@@ -1123,6 +1123,22 @@ func registerSCEP(
 	return nil
 }
 
+func RegisterSCEPProxy(
+	mux *http.ServeMux,
+	logger kitlog.Logger,
+) error {
+	scepService := NewSCEPProxyService(
+		kitlog.With(logger, "component", "mdm-apple-scep"),
+	)
+	scepLogger := kitlog.With(logger, "component", "http-scep-proxy")
+	e := scepserver.MakeServerEndpoints(scepService)
+	e.GetEndpoint = scepserver.EndpointLoggingMiddleware(scepLogger)(e.GetEndpoint)
+	e.PostEndpoint = scepserver.EndpointLoggingMiddleware(scepLogger)(e.PostEndpoint)
+	scepHandler := scepserver.MakeHTTPHandler(e, scepService, scepLogger)
+	mux.Handle(apple_mdm.SCEPProxyPath, scepHandler)
+	return nil
+}
+
 // NanoMDMLogger is a logger adapter for nanomdm.
 type NanoMDMLogger struct {
 	logger kitlog.Logger
