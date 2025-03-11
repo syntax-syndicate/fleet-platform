@@ -5250,7 +5250,6 @@ func (s *integrationMDMTestSuite) TestSSO() {
 	}`), http.StatusOK, &acResp)
 	wantSettings := fleet.SSOProviderSettings{
 		EntityID:    "https://localhost:8080",
-		IssuerURI:   "http://localhost:8080/simplesaml/saml2/idp/SSOService.php",
 		IDPName:     "SimpleSAML",
 		MetadataURL: "http://localhost:9080/simplesaml/saml2/idp/metadata.php",
 	}
