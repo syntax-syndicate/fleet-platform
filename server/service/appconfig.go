@@ -131,6 +131,18 @@ func getAppConfigEndpoint(ctx context.Context, request interface{}, svc fleet.Se
 		return nil, err
 	}
 
+	var conditionalAccessSettings *fleet.ConditionalAccessSettings
+	conditionalAccessIntegration, err := svc.ConditionalAccessMicrosoftGet(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if conditionalAccessIntegration != nil {
+		conditionalAccessSettings = &fleet.ConditionalAccessSettings{
+			MicrosoftEntraTenantID:             conditionalAccessIntegration.TenantID,
+			MicrosoftEntraConnectionConfigured: conditionalAccessIntegration.SetupDone,
+		}
+	}
+
 	isGlobalAdmin := vc.User.GlobalRole != nil && *vc.User.GlobalRole == fleet.RoleAdmin
 	isAnyTeamAdmin := false
 	if vc.User.Teams != nil {
@@ -178,9 +190,10 @@ func getAppConfigEndpoint(ctx context.Context, request interface{}, svc fleet.Se
 			HostExpirySettings:     appConfig.HostExpirySettings,
 			ActivityExpirySettings: appConfig.ActivityExpirySettings,
 
-			SMTPSettings: smtpSettings,
-			SSOSettings:  ssoSettings,
-			AgentOptions: agentOptions,
+			SMTPSettings:      smtpSettings,
+			ConditionalAccess: conditionalAccessSettings,
+			SSOSettings:       ssoSettings,
+			AgentOptions:      agentOptions,
 
 			FleetDesktop: fleetDesktop,
 

@@ -2041,6 +2041,14 @@ type Datastore interface {
 	DeleteScimGroup(ctx context.Context, id uint) error
 	// ListScimGroups retrieves a list of SCIM groups with pagination
 	ListScimGroups(ctx context.Context, opts ScimListOptions) (groups []ScimGroup, totalResults uint, err error)
+
+	// /////////////////////////////////////////////////////////////////////////////
+	// Microsoft Compliance Partner
+
+	ConditionalAccessMicrosoftCreateIntegration(ctx context.Context, tenantID, proxyServerSecret string) error
+	ConditionalAccessMicrosoftGet(ctx context.Context) (*ConditionalAccessMicrosoftIntegration, error)
+	ConditionalAccessMicrosoftMarkSetupDone(ctx context.Context) error
+	ConditionalAccessMicrosoftDelete(ctx context.Context) error
 }
 
 type AndroidDatastore interface {
@@ -2213,3 +2221,13 @@ func IsForeignKey(err error) bool {
 }
 
 type OptionalArg func() interface{}
+
+type ConditionalAccessMicrosoftIntegration struct {
+	TenantID          string `db:"tenant_id"`
+	ProxyServerSecret string `db:"proxy_server_secret"`
+	SetupDone         bool   `db:"setup_done"`
+}
+
+func (c *ConditionalAccessMicrosoftIntegration) AuthzType() string {
+	return "conditional_access_microsoft"
+}
